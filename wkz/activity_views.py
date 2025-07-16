@@ -80,7 +80,7 @@ def add_activity_view(request):
             instance = form.save()
             instance.save()
             messages.success(request, f"Successfully added '{form.cleaned_data['name']}'")
-            return HttpResponseRedirect(reverse("home"))
+            return HttpResponseRedirect(reverse("dashboard"))
         else:
             log.warning(f"form invalid: {form.errors}")
     else:
@@ -213,4 +213,4 @@ class DemoActivityDeleteView(DeleteView):
         for activity in activities:
             activity.delete()
         log.info("deleted demo activities")
-        return HttpResponseRedirect(reverse("home"))
+        return HttpResponseRedirect(reverse("dashboard"))

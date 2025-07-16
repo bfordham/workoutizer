@@ -2,12 +2,12 @@
 
 <div class="sidebar" data-color="default" data-active-color="danger">
     <div class="logo">
-        <a href="{% url 'home' %}" class="simple-text logo-mini">
+        <a href="{% url 'dashboard' %}" class="simple-text logo-mini">
             <div class="logo-image-small">
                 <img src="{% static 'img/favicon.ico' %}">
             </div>
         </a>
-        <a href="{% url 'home' %}" class="simple-text logo-normal">
+        <a href="{% url 'dashboard' %}" class="simple-text logo-normal">
             Workoutizer
         </a>
     </div>
@@ -19,7 +19,7 @@
             {% else %}
                 <li>
             {% endif %}
-            <a href="{% url 'home' %}">
+            <a href="{% url 'dashboard' %}">
                 <i class="fas fa-chart-line"></i>
                 <p>Dashboard</p>
             </a>

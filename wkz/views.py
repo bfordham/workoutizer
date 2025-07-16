@@ -5,11 +5,14 @@ from typing import List, Union
 
 import pytz
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.views.generic import View
 
 from wkz import configuration as cfg
@@ -39,10 +42,17 @@ def get_all_form_field_ids():
     return ids
 
 
-class WKZView(View):
-    sports = models.Sport.objects.all().order_by("name")
+class WKZView(LoginRequiredMixin, View):
     form_field_ids = get_all_form_field_ids()
-    context = {"sports": sports, "form_field_ids": form_field_ids, "style": Style}
+    
+    def get_user_sports(self):
+        return models.Sport.objects.filter(user=self.request.user).order_by("name")
+    
+    def get_context_data(self, **kwargs):
+        sports = self.get_user_sports()
+        context = {"sports": sports, "form_field_ids": self.form_field_ids, "style": Style}
+        context.update(kwargs)
+        return context
 
 
 class MapView(View):
@@ -88,33 +98,38 @@ class PlotView:
     settings = None
 
     def get_days_config(self):
-        self.settings = models.get_settings()
+        if hasattr(self.request, 'user') and self.request.user.is_authenticated:
+            self.settings = models.get_settings(self.request.user)
+        else:
+            self.settings = models.get_settings()
         self.number_of_days = self.settings.number_of_days
-        self.days_choices = models.Settings.days_choices
+        self.days_choices = models.UserProfile.days_choices
 
     def get_activity_data_for_plots(self, sport_id=None):
         self.get_days_config()
         now = timezone.now()
         start_datetime = now - datetime.timedelta(days=self.number_of_days)
+        base_filter = {'date__range': [start_datetime, now]}
+        
+        if hasattr(self.request, 'user') and self.request.user.is_authenticated:
+            base_filter['user'] = self.request.user
+            
         if sport_id:
-            activities = models.Activity.objects.filter(date__range=[start_datetime, now], sport=sport_id).order_by(
-                "-date"
-            )
-        else:
-            activities = models.Activity.objects.filter(date__range=[start_datetime, now]).order_by("-date")
+            base_filter['sport'] = sport_id
+            
+        activities = models.Activity.objects.filter(**base_filter).order_by("-date")
         return activities
 
 
-class DashboardView(View, PlotView):
+class DashboardView(LoginRequiredMixin, View, PlotView):
     template_name = "dashboard.html"
-    sports = models.Sport.objects.all().order_by("name")
 
     def get(self, request):
         page = 0
-        settings = models.get_settings()
-        self.sports = models.Sport.objects.all().order_by("name")
+        settings = models.get_settings(request.user)
+        self.sports = models.Sport.objects.filter(user=request.user).order_by("name")
         activities = self.get_activity_data_for_plots()
-        summary = get_summary_of_all_activities()
+        summary = get_summary_of_all_activities(request.user)
         context = {
             "sports": self.sports,
             "current_page": page,
@@ -155,10 +170,11 @@ class DashboardView(View, PlotView):
         return render(request, self.template_name, {**context})
 
 
+@login_required
 def settings_view(request):
-    sports = models.Sport.objects.all().order_by("name")
-    settings = models.get_settings()
-    activities = models.Activity.objects.filter(is_demo_activity=True).count()
+    sports = models.Sport.objects.filter(user=request.user).order_by("name")
+    settings = models.get_settings(request.user)
+    activities = models.Activity.objects.filter(user=request.user, is_demo_activity=True).count()
     form = forms.EditSettingsForm(request.POST or None, instance=settings)
     return render(
         request,
@@ -175,9 +191,10 @@ def settings_view(request):
     )
 
 
+@login_required
 def settings_form(request):
-    settings = models.get_settings()
-    activities = models.Activity.objects.filter(is_demo_activity=True).count()
+    settings = models.get_settings(request.user)
+    activities = models.Activity.objects.filter(user=request.user, is_demo_activity=True).count()
     form = forms.EditSettingsForm(request.POST or None, instance=settings)
     if request.method == "POST":
         if form.is_valid():
@@ -199,42 +216,49 @@ class HelpView(WKZView):
     template_name = "lib/help.html"
 
     def get(self, request):
-        self.context["version"] = __version__
-        self.context["page_name"] = "Help"
-        return render(request, template_name=self.template_name, context=self.context)
+        context = self.get_context_data()
+        context["version"] = __version__
+        context["page_name"] = "Help"
+        return render(request, template_name=self.template_name, context=context)
 
 
+@login_required
 def set_number_of_days(request, number_of_days):
-    settings = models.get_settings()
+    settings = models.get_settings(request.user)
     settings.number_of_days = number_of_days
     log.debug(f"number of days: {number_of_days}")
     settings.save()
     if request.META.get("HTTP_REFERER"):
         return redirect(request.META.get("HTTP_REFERER"))
     else:
-        return HttpResponseRedirect(reverse("home"))
+        return HttpResponseRedirect(reverse("dashboard"))
 
 
-def get_summary_of_all_activities(sport_slug=None):
-    all_activities = models.Activity.objects.all()
+def get_summary_of_all_activities(user=None, sport_slug=None):
+    base_filter = {}
+    if user:
+        base_filter['user'] = user
+        
+    all_activities = models.Activity.objects.filter(**base_filter)
     seven_days_back = (datetime.datetime.now() - datetime.timedelta(days=7)).replace(
         tzinfo=pytz.timezone(django_settings.TIME_ZONE)
     )
     if sport_slug:
-        count = models.Activity.objects.filter(sport__slug=sport_slug).count()
-        duration = models.Activity.objects.filter(sport__slug=sport_slug)
+        sport_filter = {**base_filter, 'sport__slug': sport_slug}
+        count = models.Activity.objects.filter(**sport_filter).count()
+        duration = models.Activity.objects.filter(**sport_filter)
         total_duration = duration.aggregate(Sum("duration"))
-        total_distance = models.Activity.objects.filter(sport__slug=sport_slug).aggregate(Sum("distance"))
+        total_distance = models.Activity.objects.filter(**sport_filter).aggregate(Sum("distance"))
         seven_days_trend = (
-            models.Activity.objects.filter(sport__slug=sport_slug)
+            models.Activity.objects.filter(**sport_filter)
             .filter(date__gt=seven_days_back)
             .aggregate(Sum("duration"))
         )
     else:
         count = all_activities.count()
         total_duration = all_activities.aggregate(Sum("duration"))
-        total_distance = models.Activity.objects.all().aggregate(Sum("distance"))
-        seven_days_trend = models.Activity.objects.filter(date__gt=seven_days_back).aggregate(Sum("duration"))
+        total_distance = all_activities.aggregate(Sum("distance"))
+        seven_days_trend = all_activities.filter(date__gt=seven_days_back).aggregate(Sum("duration"))
     duration = total_duration["duration__sum"] if total_duration["duration__sum"] else datetime.timedelta(minutes=0)
     distance = int(total_distance["distance__sum"]) if total_distance["distance__sum"] else 0
     seven_days_trend = (
@@ -245,7 +269,7 @@ def get_summary_of_all_activities(sport_slug=None):
 
 def custom_400_view(request, exception=None):
     messages.error(request, f"Could not find {request.path}")
-    return redirect(reverse("home"))
+    return redirect(reverse("dashboard"))
 
 
 def custom_500_view(request, exception=None):

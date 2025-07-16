@@ -26,3 +26,4 @@ profiling/
 *.prof
 pytest-report.html
 assets/
+env/

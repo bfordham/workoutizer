@@ -1,0 +1,56 @@
+{% extends "lib/base.html" %}
+
+{% block body %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="header">
+                <h4 class="title">User Profile</h4>
+            </div>
+            <div class="content">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Username</label>
+                            <p class="form-control-static">{{ user.username }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Email</label>
+                            <p class="form-control-static">{{ user.email }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>First Name</label>
+                            <p class="form-control-static">{{ user.first_name }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Last Name</label>
+                            <p class="form-control-static">{{ user.last_name }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label>Member Since</label>
+                            <p class="form-control-static">{{ user.date_joined|date:"F j, Y" }}</p>
+                        </div>
+                    </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <a href="{% url 'edit-profile' %}" class="btn btn-info btn-fill">Edit Profile</a>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

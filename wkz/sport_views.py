@@ -64,7 +64,7 @@ class SportView(MapView, PlotView):
         settings = models.get_settings()
         if sports_name_slug == "undefined":
             log.warning("could not find sport - redirecting to home")
-            return HttpResponseRedirect(reverse("home"))
+            return HttpResponseRedirect(reverse("dashboard"))
         sport = models.Sport.objects.get(slug=sports_name_slug)
         activities = self.get_activity_data_for_plots(sport_id=sport.id)
         context = {}

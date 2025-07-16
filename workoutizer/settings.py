@@ -25,7 +25,7 @@ STATIC_URL = "/static/"
 # however, as long as workoutizer is only used locally this is not an issue
 SECRET_KEY = "h#ppx^(%ya18qrm+hgzf-vxr^t=r57k_65_hr73f^-n)@qc9as"
 
-DEBUG = os.getenv("DJANGO_DEBUG", False)
+DEBUG = os.getenv("DJANGO_DEBUG", True)
 
 ALLOWED_HOSTS = ["*"]
 
@@ -102,7 +102,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "Europe/Berlin"
+TIME_ZONE = "America/New_York"
 USE_I18N = True
 USE_TZ = True
 
@@ -130,3 +130,8 @@ LOGGING = get_logging_config(
 )
 
 HUEY = SqliteHuey(filename="/tmp/huey.db")
+
+# Authentication settings
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/login/'

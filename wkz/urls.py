@@ -1,11 +1,18 @@
 import django_eventstream
+from django.contrib.auth import views as auth_views
 from django.urls import include, path, re_path
 
-from wkz import activity_views, api, awards_views, sport_views, views
+from wkz import activity_views, api, auth_views as custom_auth_views, awards_views, sport_views, views
 
 urlpatterns = [
+    # Authentication
+    path("login/", auth_views.LoginView.as_view(template_name='auth/login.html'), name="login"),
+    path("logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path("signup/", custom_auth_views.signup_view, name="signup"),
+    path("profile/", custom_auth_views.profile_view, name="profile"),
+    path("profile/edit/", custom_auth_views.edit_profile_view, name="edit-profile"),
     # home Dashboard
-    path("", views.DashboardView.as_view(), name="home"),
+    path("", views.DashboardView.as_view(), name="dashboard"),
     path("set_number_of_days/<slug:number_of_days>", views.set_number_of_days, name="set-number-of-days"),
     path("activities_page/<slug:page>", views.get_bulk_of_rows_for_next_page, name="activities-page"),
     # Settings

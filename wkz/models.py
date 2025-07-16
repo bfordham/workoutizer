@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from colorfield.fields import ColorField
+from django.contrib.auth.models import User
 from django.db import models
 from django.template.defaultfilters import slugify
 from django.utils import timezone
@@ -15,19 +16,84 @@ from workoutizer import settings as django_settings
 log = logging.getLogger(__name__)
 
 
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    
+    days_choices = [
+        (9999, "all"),
+        (1095, "3 years"),
+        (730, "2 years"),
+        (365, "1 year"),
+        (180, "180 days"),
+        (90, "90 days"),
+        (30, "30 days"),
+        (10, "10 days"),
+    ]
+    
+    path_to_trace_dir = models.CharField(
+        max_length=200, default=django_settings.TRACKS_DIR, verbose_name="Path to Traces Directory"
+    )
+    path_to_garmin_device = models.CharField(
+        max_length=200,
+        default="",
+        verbose_name="Path to Garmin Device",
+        blank=True,
+    )
+    number_of_days = models.IntegerField(choices=days_choices, default=30)
+    delete_files_after_import = models.BooleanField(verbose_name="Delete fit Files after Copying ", default=False)
+
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
+
+    __original_path_to_trace_dir = None
+
+    def __init__(self, *args, **kwargs):
+        super(UserProfile, self).__init__(*args, **kwargs)
+        self.__original_path_to_trace_dir = self.path_to_trace_dir
+        self.__original_path_to_garmin_device = self.path_to_garmin_device
+
+    def save(self, force_insert=False, force_update=False, *args, **kwargs):
+        super(UserProfile, self).save(force_insert, force_update, *args, **kwargs)
+        # whenever a path changes, check if it is a valid dir and retrigger watchdog
+        if self.path_to_trace_dir != self.__original_path_to_trace_dir:
+            from wkz import models
+
+            if Path(self.path_to_trace_dir).is_dir():
+                run_importer(models)
+            else:
+                sse.send(f"<code>{self.path_to_trace_dir}</code> is not a valid path.", "red", "WARNING")
+        self.__original_path_to_trace_dir = self.path_to_trace_dir
+
+        if self.path_to_garmin_device != self.__original_path_to_garmin_device:
+            if self.path_to_garmin_device == "":
+                sse.send("Disabled device watchdog.", "green", log_level="INFO")
+            elif Path(self.path_to_garmin_device).is_dir():
+                sse.send(f"<b>Device watchdog</b> now monitors <code>{self.path_to_garmin_device}</code>", "green")
+            else:
+                sse.send(f"<code>{self.path_to_garmin_device}</code> is not a valid path.", "red", "WARNING")
+        self.__original_path_to_garmin_device = self.path_to_garmin_device
+
+    def __str__(self):
+        return f"{self.user.username} Profile"
+
+
 class Sport(models.Model):
     def __str__(self):
         return self.name
 
-    name = models.CharField(max_length=24, unique=True, verbose_name="Sport Name")
-    mapping_name = models.CharField(max_length=24, unique=True, blank=True, null=True, verbose_name="Mapping Name")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    name = models.CharField(max_length=24, verbose_name="Sport Name")
+    mapping_name = models.CharField(max_length=24, blank=True, null=True, verbose_name="Mapping Name")
     icon = models.CharField(max_length=24, verbose_name="Icon")
-    slug = models.SlugField(max_length=100, unique=True, blank=True)
+    slug = models.SlugField(max_length=100, blank=True)
     color = ColorField(default="#42FF71", verbose_name="Color")
     evaluates_for_awards = models.BooleanField(verbose_name="Consider Sport for Awards", default=True)
 
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['user', 'name']
 
     def save(self, *args, **kwargs):
         self.slug = slugify(self.name)
@@ -89,22 +155,17 @@ class Traces(models.Model):
 
 
 def default_sport(return_pk: bool = True):
-    sport = Sport.objects.filter(slug="unknown").first()
-    if not sport:
-        sport = Sport(name="unknown", color="gray", icon="question-circle", slug="unknown", mapping_name="unknown")
-        sport.save()
-    if return_pk:
-        return sport.pk
-    else:
-        return sport
+    # Return None to handle in model field default
+    return None
 
 
 class Activity(models.Model):
     def __str__(self):
         return f"{self.name} ({self.sport})"
 
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=200, verbose_name="Activity Name", default="unknown")
-    sport = models.ForeignKey(Sport, on_delete=models.SET_DEFAULT, default=default_sport, verbose_name="Sport")
+    sport = models.ForeignKey(Sport, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Sport")
     date = models.DateTimeField(blank=False, default=timezone.now, verbose_name="Date")
     duration = models.DurationField(verbose_name="Duration", default=datetime.timedelta(minutes=30))
     distance = models.FloatField(blank=True, null=True, verbose_name="Distance", default=0)
@@ -221,5 +282,15 @@ class Settings(models.Model):
         self.__original_path_to_garmin_device = self.path_to_garmin_device
 
 
-def get_settings():
-    return Settings.objects.get_or_create(pk=1)[0]
+def get_settings(user=None):
+    if user:
+        profile, created = UserProfile.objects.get_or_create(user=user)
+        return profile
+    else:
+        # For backward compatibility, return the old Settings object
+        return Settings.objects.get_or_create(pk=1)[0]
+
+
+def get_user_profile(user):
+    profile, created = UserProfile.objects.get_or_create(user=user)
+    return profile
