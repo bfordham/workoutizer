@@ -13,29 +13,48 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>{{ form.first_name.label }}</label>
-                                {{ form.first_name }}
-                                {% if form.first_name.errors %}
-                                    <div class="text-danger">{{ form.first_name.errors }}</div>
+                                <label>{{ user_form.first_name.label }}</label>
+                                {{ user_form.first_name }}
+                                {% if user_form.first_name.errors %}
+                                    <div class="text-danger">{{ user_form.first_name.errors }}</div>
                                 {% endif %}
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>{{ form.last_name.label }}</label>
-                                {{ form.last_name }}
-                                {% if form.last_name.errors %}
-                                    <div class="text-danger">{{ form.last_name.errors }}</div>
+                                <label>{{ user_form.last_name.label }}</label>
+                                {{ user_form.last_name }}
+                                {% if user_form.last_name.errors %}
+                                    <div class="text-danger">{{ user_form.last_name.errors }}</div>
                                 {% endif %}
                             </div>
                         </div>
                     </div>
                     
-                    {% if form.non_field_errors %}
+                    <hr>
+                    <h5>Privacy Settings</h5>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-check">
+                                <label class="form-check-label">
+                                    {{ settings_form.public_profile }}
+                                    <span class="form-check-sign"></span>
+                                    {{ settings_form.public_profile.label }}
+                                </label>
+                                <small class="form-text text-muted">{{ settings_form.public_profile.help_text }}</small>
+                                {% if settings_form.public_profile.errors %}
+                                    <div class="text-danger">{{ settings_form.public_profile.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if user_form.non_field_errors or settings_form.non_field_errors %}
                         <div class="row">
                             <div class="col-md-12">
                                 <div class="alert alert-danger">
-                                    {{ form.non_field_errors }}
+                                    {{ user_form.non_field_errors }}
+                                    {{ settings_form.non_field_errors }}
                                 </div>
                             </div>
                         </div>

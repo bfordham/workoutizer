@@ -43,6 +43,22 @@
                             <p class="form-control-static">{{ user.date_joined|date:"F j, Y" }}</p>
                         </div>
                     </div>
+                </div>
+                {% if profile.public_profile %}
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label>Public Profile URL</label>
+                            <p class="form-control-static">
+                                <a href="{% url 'public-profile' user.username %}" target="_blank">
+                                    {{ request.get_host }}{% url 'public-profile' user.username %}
+                                </a>
+                                <small class="text-muted d-block">Others can view your activities at this URL</small>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
                 <div class="row">
                     <div class="col-md-12">
                         <a href="{% url 'edit-profile' %}" class="btn btn-info btn-fill">Edit Profile</a>

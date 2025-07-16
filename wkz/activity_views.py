@@ -4,6 +4,8 @@ import os
 
 import pytz
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.forms import modelformset_factory
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
@@ -24,17 +26,20 @@ from workoutizer import settings as django_settings
 log = logging.getLogger(__name__)
 
 
-class ActivityView(MapView):
+class ActivityView(LoginRequiredMixin, MapView):
     template_name = "activity/activity.html"
 
     def get(self, request, activity_id):
-        activity = Activity.objects.get(id=activity_id)
+        try:
+            activity = Activity.objects.get(id=activity_id, user=request.user)
+        except Activity.DoesNotExist:
+            raise Http404("Activity not found")
         context = super(ActivityView, self).get(request=request, list_of_activities=[activity])
         settings = context["settings"]
         setattr(settings, "every_nth_value", cfg.every_nth_value)
         context["settings"] = settings
         activity_context = {
-            "sports": Sport.objects.all().order_by("name"),
+            "sports": Sport.objects.filter(user=request.user).order_by("name"),
             "activity": activity,
             "form_field_ids": get_all_form_field_ids(),
             "fastest_sections": BestSection.objects.filter(activity=activity, kind="fastest"),
@@ -54,10 +59,10 @@ class ActivityView(MapView):
         activity_context["evaluates_for_awards"] = False
         if activity_suitable_for_awards(activity):
             activity_context["top_fastest_awards"] = get_top_awards_for_one_sport(
-                sport=activity.sport, top_score=cfg.rank_limit, kinds=["fastest"]
+                sport=activity.sport, user=activity.user, top_score=cfg.rank_limit, kinds=["fastest"]
             )
             activity_context["top_climb_awards"] = get_top_awards_for_one_sport(
-                sport=activity.sport, top_score=cfg.rank_limit, kinds=["climb"]
+                sport=activity.sport, user=activity.user, top_score=cfg.rank_limit, kinds=["climb"]
             )
             activity_context["ascent_awards_ranking"] = get_ascent_ranking_of_activity(activity)
             activity_context["evaluates_for_awards"] = True
@@ -72,10 +77,11 @@ def _get_map_height(number_of_plots: int) -> int:
         return height
 
 
+@login_required
 def add_activity_view(request):
-    sports = Sport.objects.all().order_by("name")
+    sports = Sport.objects.filter(user=request.user).order_by("name")
     if request.method == "POST":
-        form = AddActivityForm(request.POST)
+        form = AddActivityForm(request.POST, user=request.user)
         if form.is_valid():
             instance = form.save()
             instance.save()
@@ -84,7 +90,7 @@ def add_activity_view(request):
         else:
             log.warning(f"form invalid: {form.errors}")
     else:
-        form = AddActivityForm(initial={"date": str(datetime.datetime.now().strftime(DATETIMEPICKER_FORMAT))})
+        form = AddActivityForm(user=request.user, initial={"date": str(datetime.datetime.now().strftime(DATETIMEPICKER_FORMAT))})
     return render(
         request,
         "activity/add_activity.html",
@@ -98,13 +104,17 @@ def add_activity_view(request):
     )
 
 
+@login_required
 def edit_activity_view(request, activity_id):
     form_field_ids = get_all_form_field_ids()
-    sports = Sport.objects.all().order_by("name")
-    activity = Activity.objects.get(id=activity_id)
+    sports = Sport.objects.filter(user=request.user).order_by("name")
+    try:
+        activity = Activity.objects.get(id=activity_id, user=request.user)
+    except Activity.DoesNotExist:
+        raise Http404("Activity not found")
     date = activity.date.astimezone(pytz.timezone(django_settings.TIME_ZONE))
     date = str(date.strftime(DATETIMEPICKER_FORMAT))
-    activity_form = EditActivityForm(request.POST or None, instance=activity, initial={"date": date})
+    activity_form = EditActivityForm(request.POST or None, instance=activity, user=request.user, initial={"date": date})
     laps = Lap.objects.filter(trace=activity.trace_file, trigger="manual")
     has_laps = True if laps else False
     if has_laps:
@@ -155,8 +165,12 @@ def _add_formset_field_ids(form_field_ids, formset):
     return form_field_ids
 
 
+@login_required
 def download_activity(request, activity_id):
-    activity = Activity.objects.get(id=activity_id)
+    try:
+        activity = Activity.objects.get(id=activity_id, user=request.user)
+    except Activity.DoesNotExist:
+        raise Http404("Activity not found")
     path = save_activity_to_gpx_file(activity=activity)
     if os.path.exists(path):
         with open(path, "rb") as fh:
@@ -166,15 +180,18 @@ def download_activity(request, activity_id):
     raise Http404
 
 
-class ActivityDeleteView(DeleteView):
+class ActivityDeleteView(LoginRequiredMixin, DeleteView):
     template_name = "activity/activity_confirm_delete.html"
     model = Activity
     slug_field = "activity_id"
     success_url = "/"
 
     def get(self, request, *args, **kwargs):
-        sports = Sport.objects.all().order_by("name")
-        activity = Activity.objects.get(id=kwargs["pk"])
+        sports = Sport.objects.filter(user=request.user).order_by("name")
+        try:
+            activity = Activity.objects.get(id=kwargs["pk"], user=request.user)
+        except Activity.DoesNotExist:
+            raise Http404("Activity not found")
         return render(
             request,
             self.template_name,
@@ -188,12 +205,12 @@ class ActivityDeleteView(DeleteView):
         )
 
 
-class DemoActivityDeleteView(DeleteView):
+class DemoActivityDeleteView(LoginRequiredMixin, DeleteView):
     template_name = "activity/demo_activity_confirm_delete.html"
 
     def get(self, request, *args, **kwargs):
-        activities = Activity.objects.filter(is_demo_activity=True)
-        sports = Sport.objects.all().order_by("name")
+        activities = Activity.objects.filter(is_demo_activity=True, user=request.user)
+        sports = Sport.objects.filter(user=request.user).order_by("name")
         log.debug(f"activities to be deleted: {activities}")
         return render(
             request,
@@ -208,7 +225,7 @@ class DemoActivityDeleteView(DeleteView):
         )
 
     def post(self, request, *args, **kwargs):
-        activities = Activity.objects.filter(is_demo_activity=True)
+        activities = Activity.objects.filter(is_demo_activity=True, user=request.user)
         log.debug(f"deleting: {activities}")
         for activity in activities:
             activity.delete()

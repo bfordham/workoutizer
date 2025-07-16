@@ -1,0 +1,97 @@
+{% extends "lib/base.html" %}
+
+{% block body %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="header">
+                <h4 class="card-title">{{ profile_user.get_full_name|default:profile_user.username }}</h4>
+                <p class="card-category">@{{ profile_user.username }}</p>
+            </div>
+            <div class="content">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label>Total Activities</label>
+                            <p class="form-control-static">{{ total_activities }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label>Total Distance</label>
+                            <p class="form-control-static">{{ total_distance }} km</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label>Member Since</label>
+                            <p class="form-control-static">{{ profile_user.date_joined|date:"F Y" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="header">
+                <h4 class="card-title">Recent Activities</h4>
+            </div>
+            <div class="content">
+                {% if activities %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Activity</th>
+                                    <th>Sport</th>
+                                    <th>Date</th>
+                                    <th>Distance</th>
+                                    <th>Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for activity in activities %}
+                                <tr>
+                                    <td>{{ activity.name }}</td>
+                                    <td>
+                                        {% if activity.sport %}
+                                            <i class="fas fa-{{ activity.sport.icon }}" style="color: {{ activity.sport.color }}"></i>
+                                            {{ activity.sport.name }}
+                                        {% else %}
+                                            Unknown
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ activity.date|date:"M j, Y" }}</td>
+                                    <td>
+                                        {% if activity.distance %}
+                                            {{ activity.distance|floatformat:1 }} km
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if activity.duration %}
+                                            {{ activity.duration|time:"H:i" }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No activities to display.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

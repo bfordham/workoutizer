@@ -285,19 +285,20 @@ def custom_500_view(request, exception=None):
     )
 
 
-def get_flat_list_of_pks_of_activities_in_top_awards(filter_on_sport: Union[None, str] = None) -> List[int]:
+def get_flat_list_of_pks_of_activities_in_top_awards(user, filter_on_sport: Union[None, str] = None) -> List[int]:
     top_award_pks = []
     if filter_on_sport:
         sport_slugs = [filter_on_sport]
     else:
         sport_slugs = [
-            sport.slug for sport in models.Sport.objects.filter(evaluates_for_awards=True).exclude(name="unknown")
+            sport.slug for sport in models.Sport.objects.filter(user=user, evaluates_for_awards=True).exclude(name="unknown")
         ]
     for sport in sport_slugs:
         for bs in cfg.best_sections:
             for distance in bs.distances:
                 top_awards = models.BestSection.objects.filter(
                     activity__sport__slug=sport,
+                    activity__user=user,
                     activity__evaluates_for_awards=True,
                     kind=bs.kind,
                     distance=distance,
@@ -307,6 +308,7 @@ def get_flat_list_of_pks_of_activities_in_top_awards(filter_on_sport: Union[None
         top_ascent_awards = (
             models.Activity.objects.filter(
                 sport__slug=sport,
+                user=user,
                 evaluates_for_awards=True,
             )
             .exclude(trace_file__total_ascent=None)
@@ -316,6 +318,7 @@ def get_flat_list_of_pks_of_activities_in_top_awards(filter_on_sport: Union[None
     return list(set(top_award_pks))
 
 
+@login_required
 def get_bulk_of_rows_for_next_page(request, page: str):
     page = int(page)
     template_name = "lib/row_bulk.html"
@@ -324,8 +327,8 @@ def get_bulk_of_rows_for_next_page(request, page: str):
     if "sport" in current_url:
         sport_slug = current_url.split("/")[-1]
 
-    activities, is_last_page = fetch_row_data_for_page(page_nr=page, sport_slug=sport_slug)
-    top_awards = get_flat_list_of_pks_of_activities_in_top_awards()
+    activities, is_last_page = fetch_row_data_for_page(page_nr=page, sport_slug=sport_slug, user=request.user)
+    top_awards = get_flat_list_of_pks_of_activities_in_top_awards(request.user)
 
     return render(
         request,
@@ -334,18 +337,24 @@ def get_bulk_of_rows_for_next_page(request, page: str):
     )
 
 
-def fetch_row_data_for_page(page_nr: int, sport_slug=None):
+def fetch_row_data_for_page(page_nr: int, sport_slug=None, user=None):
     number_of_rows = cfg.number_of_rows_per_page_in_table
     start = page_nr * number_of_rows
     end = (page_nr + 1) * number_of_rows
     log.debug(f"fetching activity data for table page {page_nr}")
     is_last_page = False
+    
+    base_filter = {}
+    if user:
+        base_filter['user'] = user
+        
     if sport_slug:
-        activities = models.Activity.objects.filter(sport__slug=sport_slug).order_by("-date")
+        filter_dict = {**base_filter, 'sport__slug': sport_slug}
+        activities = models.Activity.objects.filter(**filter_dict).order_by("-date")
         total_nr_of_activities = activities.count()
         activities = activities[start:end]
     else:
-        activities = models.Activity.objects.all().order_by("-date")
+        activities = models.Activity.objects.filter(**base_filter).order_by("-date")
         total_nr_of_activities = activities.count()
         activities = activities[start:end]
 

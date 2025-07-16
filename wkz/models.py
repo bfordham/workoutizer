@@ -41,6 +41,8 @@ class UserProfile(models.Model):
     )
     number_of_days = models.IntegerField(choices=days_choices, default=30)
     delete_files_after_import = models.BooleanField(verbose_name="Delete fit Files after Copying ", default=False)
+    public_profile = models.BooleanField(verbose_name="Make Profile Public", default=False, 
+                                       help_text="Allow others to view your activities at /users/<username>")
 
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)

@@ -11,6 +11,8 @@ urlpatterns = [
     path("signup/", custom_auth_views.signup_view, name="signup"),
     path("profile/", custom_auth_views.profile_view, name="profile"),
     path("profile/edit/", custom_auth_views.edit_profile_view, name="edit-profile"),
+    # Public profiles
+    path("users/<str:username>/", custom_auth_views.public_profile_view, name="public-profile"),
     # home Dashboard
     path("", views.DashboardView.as_view(), name="dashboard"),
     path("set_number_of_days/<slug:number_of_days>", views.set_number_of_days, name="set-number-of-days"),

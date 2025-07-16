@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from .models import UserProfile
 
 
 class UserProfileEditForm(forms.ModelForm):
@@ -13,6 +14,17 @@ class UserProfileEditForm(forms.ModelForm):
         # Add form-control class to all fields
         for field_name, field in self.fields.items():
             field.widget.attrs['class'] = 'form-control'
+
+
+class UserProfileSettingsForm(forms.ModelForm):
+    class Meta:
+        model = UserProfile
+        fields = ('public_profile',)
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Style the checkbox properly
+        self.fields['public_profile'].widget.attrs['class'] = 'form-check-input'
 
 
 class SignUpForm(UserCreationForm):
