@@ -2,14 +2,20 @@ import csv
 import json
 import os
 import shutil
+import gzip
+import tempfile
 from datetime import datetime
 from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.core.files import File
 from django.utils.dateparse import parse_datetime
-from wkz.models import Activity, Sport, ActivityPhoto
+from wkz.models import Activity, Sport, ActivityPhoto, Traces
 from wkz.utils.sport_mapping import SportMapper
+from wkz.io.file_importer import _parse_single_file, _save_single_parsed_file_to_db
+from wkz.tools.utils import calc_md5
+from pathlib import Path
+from wkz import models
 
 
 class Command(BaseCommand):
@@ -33,11 +39,17 @@ class Command(BaseCommand):
             action='store_true',
             help='Show what would be imported without actually importing'
         )
+        parser.add_argument(
+            '--process-gps',
+            action='store_true',
+            help='Process GPS files for existing activities that don\'t have GPS data'
+        )
 
     def handle(self, *args, **options):
         username = options['username']
         strava_dir = options['strava_dir']
         dry_run = options['dry_run']
+        process_gps = options['process_gps']
 
         try:
             user = User.objects.get(username=username)
@@ -66,17 +78,20 @@ class Command(BaseCommand):
         imported_count = 0
         skipped_count = 0
         error_count = 0
+        gps_processed_count = 0
 
         with open(activities_csv, 'r', encoding='utf-8') as csvfile:
             reader = csv.DictReader(csvfile)
             
             for row in reader:
                 try:
-                    result = self._import_activity(user, row, strava_dir, dry_run)
+                    result = self._import_activity(user, row, strava_dir, dry_run, process_gps)
                     if result == 'imported':
                         imported_count += 1
                     elif result == 'skipped':
                         skipped_count += 1
+                    elif result == 'gps_processed':
+                        gps_processed_count += 1
                 except Exception as e:
                     error_count += 1
                     self.stdout.write(
@@ -86,11 +101,11 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f'Import complete. Imported: {imported_count}, '
-                f'Skipped: {skipped_count}, Errors: {error_count}'
+                f'Skipped: {skipped_count}, GPS Processed: {gps_processed_count}, Errors: {error_count}'
             )
         )
 
-    def _import_activity(self, user, row, strava_dir, dry_run):
+    def _import_activity(self, user, row, strava_dir, dry_run, process_gps=False):
         """Import a single activity from CSV row"""
         activity_id = row.get('Activity ID')
         if not activity_id:
@@ -104,8 +119,17 @@ class Command(BaseCommand):
         ).first()
         
         if existing:
-            self.stdout.write(f'Skipping existing activity: {activity_id}')
-            return 'skipped'
+            if process_gps and not existing.trace_file:
+                # Process GPS file for existing activity without GPS data
+                self.stdout.write(f'Processing GPS for existing activity: {activity_id}')
+                
+                # Import GPS file if it exists
+                self._import_gps_file(existing, row, strava_dir)
+                
+                return 'gps_processed'
+            else:
+                self.stdout.write(f'Skipping existing activity: {activity_id}')
+                return 'skipped'
 
         # Parse date
         date_str = row.get('Activity Date')
@@ -167,6 +191,9 @@ class Command(BaseCommand):
 
         # Import photos if they exist
         self._import_photos(activity, activity_id, strava_dir)
+
+        # Import GPS file if it exists
+        self._import_gps_file(activity, row, strava_dir)
 
         return 'imported'
 
@@ -286,3 +313,61 @@ class Command(BaseCommand):
 
         if photo_count > 0:
             self.stdout.write(f'  Imported {photo_count} photos')
+
+    def _import_gps_file(self, activity, row, strava_dir):
+        """Import GPS file for an activity"""
+        filename = row.get('Filename', '')
+        if not filename:
+            return
+
+        # Handle both absolute paths and relative paths
+        if filename.startswith('activities/'):
+            gps_file_path = os.path.join(strava_dir, filename)
+        else:
+            gps_file_path = os.path.join(strava_dir, 'activities', filename)
+
+        if not os.path.exists(gps_file_path):
+            self.stdout.write(f'  GPS file not found: {gps_file_path}')
+            return
+
+        temp_file_path = None
+        try:
+            # Handle compressed files
+            if filename.endswith('.gz'):
+                # Get the file extension without .gz
+                base_name = os.path.basename(filename[:-3])
+                
+                # Decompress file to a temporary location
+                with tempfile.NamedTemporaryFile(suffix=f'_{base_name}', delete=False) as temp_file:
+                    with gzip.open(gps_file_path, 'rb') as gz_file:
+                        temp_file.write(gz_file.read())
+                    temp_file_path = temp_file.name
+            else:
+                temp_file_path = gps_file_path
+
+            # Parse the GPS file using existing parser
+            file_path = Path(temp_file_path)
+            md5sum = calc_md5(file_path)
+            parsed_data = _parse_single_file(file_path, Path(strava_dir), md5sum)
+            
+            if parsed_data:
+                # Save parsed data to database (this handles traces, laps, and activities)
+                _save_single_parsed_file_to_db(parsed_data, models, False, False)
+                
+                # Find the trace that was just created
+                trace = models.Traces.objects.get(md5sum=parsed_data.md5sum)
+                
+                # Link the trace to the activity
+                activity.trace_file = trace
+                activity.save()
+                
+                self.stdout.write(f'  Imported GPS data: {filename}')
+            else:
+                self.stdout.write(f'  Failed to parse GPS file: {filename}')
+
+        except Exception as e:
+            self.stdout.write(f'  Error importing GPS file {filename}: {str(e)}')
+        finally:
+            # Clean up temporary file if created
+            if filename.endswith('.gz') and temp_file_path and os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
