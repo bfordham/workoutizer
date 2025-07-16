@@ -84,12 +84,22 @@ class Sport(models.Model):
         return self.name
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
-    name = models.CharField(max_length=24, verbose_name="Sport Name")
-    mapping_name = models.CharField(max_length=24, blank=True, null=True, verbose_name="Mapping Name")
-    icon = models.CharField(max_length=24, verbose_name="Icon")
+    name = models.CharField(max_length=50, verbose_name="Sport Name")
+    mapping_name = models.CharField(max_length=50, blank=True, null=True, verbose_name="Mapping Name")
+    icon = models.CharField(max_length=50, verbose_name="Icon")
     slug = models.SlugField(max_length=100, blank=True)
     color = ColorField(default="#42FF71", verbose_name="Color")
     evaluates_for_awards = models.BooleanField(verbose_name="Consider Sport for Awards", default=True)
+    
+    # Enhanced fields for better categorization
+    category = models.CharField(max_length=50, blank=True, null=True, verbose_name="Category",
+                               help_text="e.g., 'Cardio', 'Strength', 'Flexibility', 'Sports', 'Water'")
+    has_distance = models.BooleanField(default=True, verbose_name="Distance-based Activity",
+                                     help_text="Whether this sport typically tracks distance")
+    external_mappings = models.TextField(blank=True, null=True, verbose_name="External Mappings",
+                                       help_text="JSON mapping of external service activity types")
+    is_system_sport = models.BooleanField(default=False, verbose_name="System Sport",
+                                        help_text="Created by system, available to all users")
 
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
@@ -170,11 +180,30 @@ class Activity(models.Model):
     sport = models.ForeignKey(Sport, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Sport")
     date = models.DateTimeField(blank=False, default=timezone.now, verbose_name="Date")
     duration = models.DurationField(verbose_name="Duration", default=datetime.timedelta(minutes=30))
-    distance = models.FloatField(blank=True, null=True, verbose_name="Distance", default=0)
-    description = models.CharField(max_length=600, blank=True, null=True, verbose_name="Description")
+    distance = models.FloatField(blank=True, null=True, verbose_name="Distance")
+    description = models.TextField(blank=True, null=True, verbose_name="Description")
     trace_file = models.ForeignKey(Traces, on_delete=models.CASCADE, blank=True, null=True)
     is_demo_activity = models.BooleanField(verbose_name="Is this a Demo Activity", default=False)
     evaluates_for_awards = models.BooleanField(verbose_name="Consider Activity for Awards", default=True)
+    
+    # Enhanced fields for Strava import and richer data
+    external_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="External ID", 
+                                  help_text="ID from external service (e.g., Strava)")
+    external_source = models.CharField(max_length=50, blank=True, null=True, verbose_name="External Source",
+                                      help_text="Source of import (e.g., 'strava', 'garmin')")
+    notes = models.TextField(blank=True, null=True, verbose_name="Notes",
+                            help_text="Additional notes or detailed description")
+    activity_type = models.CharField(max_length=100, blank=True, null=True, verbose_name="Activity Type",
+                                   help_text="Specific activity type from external source")
+    
+    # Metrics for non-distance activities
+    calories = models.IntegerField(blank=True, null=True, verbose_name="Calories")
+    average_heart_rate = models.IntegerField(blank=True, null=True, verbose_name="Average Heart Rate")
+    max_heart_rate = models.IntegerField(blank=True, null=True, verbose_name="Max Heart Rate")
+    
+    # Achievement tracking
+    kudos_count = models.IntegerField(blank=True, null=True, verbose_name="Kudos/Likes")
+    achievement_count = models.IntegerField(blank=True, null=True, verbose_name="Achievements")
 
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
@@ -188,6 +217,38 @@ class Activity(models.Model):
                 log.debug(f"deleted trace file also: {self.name}")
         super(Activity, self).delete(*args, **kwargs)
         log.debug(f"deleted activity: {self.name}")
+
+    @property
+    def has_distance(self):
+        """Check if this activity has meaningful distance data"""
+        return self.distance is not None and self.distance > 0
+
+    @property 
+    def display_distance(self):
+        """Return formatted distance or '-' if no distance"""
+        if self.has_distance:
+            return f"{self.distance:.1f} km"
+        return "-"
+
+    class Meta:
+        verbose_name_plural = "Activities"
+        unique_together = ['external_id', 'external_source', 'user']  # Prevent duplicate imports
+
+
+class ActivityPhoto(models.Model):
+    """Model for storing activity photos"""
+    activity = models.ForeignKey(Activity, on_delete=models.CASCADE, related_name='photos')
+    image = models.ImageField(upload_to='activity_photos/%Y/%m/', verbose_name="Photo")
+    caption = models.CharField(max_length=200, blank=True, null=True, verbose_name="Caption")
+    external_photo_id = models.CharField(max_length=100, blank=True, null=True, 
+                                       verbose_name="External Photo ID")
+    upload_date = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Photo for {self.activity.name}"
+
+    class Meta:
+        ordering = ['upload_date']
 
 
 class Lap(models.Model):

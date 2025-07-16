@@ -81,10 +81,12 @@
                             <p class="card-title">
                                 {% if activity.trace_file.calories %}
                                     {{ activity.trace_file.calories }} kcal
+                                {% elif activity.calories %}
+                                    {{ activity.calories }} kcal
                                 {% else %}
                                     - kcal
                                 {% endif %}
-                            <p>
+                            </p>
                         </div>
                     </div>
                 </div>

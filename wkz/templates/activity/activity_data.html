@@ -150,6 +150,30 @@
                 </div>
             </div>
         </div>
+    {% elif activity.average_heart_rate or activity.max_heart_rate %}
+        <div class="col">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">Heart Rate</h4>
+                </div>
+                <div class="card-body">
+                    <table class="table table-hover table-borderless text-muted table-sm">
+                        {% if activity.average_heart_rate %}
+                        <tr data-toggle="tooltip" data-placement="left" title="Average Heart Rate">
+                            <td><i class="fas fa-heartbeat" style="color: grey"></i><small style="color: grey"> avg</small></td>
+                            <td>{{ activity.average_heart_rate }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if activity.max_heart_rate %}
+                        <tr data-toggle="tooltip" data-placement="left" title="Max Heart Rate">
+                            <td><i class="fas fa-heartbeat" style="color: grey"></i><small style="color: grey"> max</small></td>
+                            <td>{{ activity.max_heart_rate }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+        </div>
     {% endif %}
 
     {% if activity.trace_file.min_temperature and activity.trace_file.avg_temperature and activity.trace_file.max_temperature %}
