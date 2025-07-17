@@ -28,7 +28,7 @@
                     {% endif %}
                         <td>{{ forloop.counter }}</td>
                         <td>{{ lap.elapsed_time|h_m_s }}</td>
-                        <td>{{ lap.distance|to_int }}</td>
+                        <td>{{ lap.distance|format_distance }}</td>
                         <td>{{ lap.speed|speed_to_pace }}</td>
                         <td>{{ lap.trigger }}</td>
                         {% if lap.label %}

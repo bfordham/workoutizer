@@ -107,3 +107,11 @@ def best_section_distance(distance: int) -> str:
         return f"{distance}m"
     else:
         return f"{int(distance/1000)}km"
+
+
+@register.filter
+def format_distance(distance):
+    """Format distance to 2 decimal places with km unit"""
+    if distance is None or distance == 0:
+        return "-"
+    return f"{float(distance):.2f}"

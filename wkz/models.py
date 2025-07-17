@@ -227,7 +227,7 @@ class Activity(models.Model):
     def display_distance(self):
         """Return formatted distance or '-' if no distance"""
         if self.has_distance:
-            return f"{self.distance:.1f} km"
+            return f"{self.distance:.2f} km"
         return "-"
 
     class Meta:
@@ -357,3 +357,126 @@ def get_settings(user=None):
 def get_user_profile(user):
     profile, created = UserProfile.objects.get_or_create(user=user)
     return profile
+
+
+class MetricTile(models.Model):
+    """Defines a metric tile that can be displayed on dashboards"""
+    
+    # Tile identification
+    name = models.CharField(max_length=100, verbose_name="Tile Name")
+    key = models.CharField(max_length=50, unique=True, verbose_name="Tile Key",
+                          help_text="Unique identifier for this tile (e.g., 'total_distance')")
+    
+    # Display properties
+    title = models.CharField(max_length=100, verbose_name="Display Title")
+    description = models.TextField(blank=True, null=True, verbose_name="Description")
+    icon = models.CharField(max_length=50, verbose_name="FontAwesome Icon Class",
+                           help_text="FontAwesome class (e.g., 'fa-road', 'fa-stopwatch')")
+    color = ColorField(default="#42FF71", verbose_name="Icon Color")
+    
+    # Metric configuration
+    metric_type = models.CharField(max_length=50, choices=[
+        ('total', 'Total (Sum)'),
+        ('average', 'Average'),
+        ('count', 'Count'),
+        ('max', 'Maximum'),
+        ('min', 'Minimum'),
+        ('trend', 'Trend (7-day)'),
+        ('custom', 'Custom Calculation'),
+    ], verbose_name="Metric Type")
+    
+    data_field = models.CharField(max_length=100, verbose_name="Data Field",
+                                 help_text="Field name from Activity or Traces model (e.g., 'distance', 'duration')")
+    
+    # Formatting
+    unit = models.CharField(max_length=20, blank=True, null=True, verbose_name="Unit",
+                           help_text="Display unit (e.g., 'km', 'hours', 'kcal')")
+    format_type = models.CharField(max_length=20, choices=[
+        ('number', 'Number'),
+        ('decimal', 'Decimal'),
+        ('duration', 'Duration'),
+        ('date', 'Date'),
+        ('custom', 'Custom Format'),
+    ], default='number', verbose_name="Format Type")
+    
+    decimal_places = models.IntegerField(default=0, verbose_name="Decimal Places")
+    
+    # Applicability
+    applicable_to = models.CharField(max_length=20, choices=[
+        ('all', 'All Activities'),
+        ('sport', 'Specific Sports'),
+        ('category', 'Sport Categories'),
+    ], default='all', verbose_name="Applicable To")
+    
+    # Ordering and display
+    is_active = models.BooleanField(default=True, verbose_name="Active")
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Metric Tile"
+        verbose_name_plural = "Metric Tiles"
+    
+    def __str__(self):
+        return f"{self.name} ({self.key})"
+
+
+class SportTileConfiguration(models.Model):
+    """Configures which tiles are displayed for specific sports"""
+    
+    sport = models.ForeignKey(Sport, on_delete=models.CASCADE, verbose_name="Sport")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True,
+                           verbose_name="User", help_text="Leave blank for global configuration")
+    
+    # Tile configuration
+    tiles = models.ManyToManyField(MetricTile, through='SportTileOrder', verbose_name="Tiles")
+    
+    # Layout settings
+    tiles_per_row = models.IntegerField(default=4, verbose_name="Tiles per Row",
+                                       help_text="Number of tiles to display per row")
+    
+    # Scope
+    applies_to = models.CharField(max_length=20, choices=[
+        ('dashboard', 'Dashboard'),
+        ('sport_page', 'Sport Page'),
+        ('public_profile', 'Public Profile'),
+        ('all', 'All Views'),
+    ], default='all', verbose_name="Applies To")
+    
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['sport', 'user', 'applies_to']
+        verbose_name = "Sport Tile Configuration"
+        verbose_name_plural = "Sport Tile Configurations"
+    
+    def __str__(self):
+        user_str = f" for {self.user.username}" if self.user else " (Global)"
+        return f"{self.sport.name} - {self.applies_to}{user_str}"
+
+
+class SportTileOrder(models.Model):
+    """Defines the order of tiles for a sport configuration"""
+    
+    sport_config = models.ForeignKey(SportTileConfiguration, on_delete=models.CASCADE)
+    tile = models.ForeignKey(MetricTile, on_delete=models.CASCADE)
+    order = models.IntegerField(default=0, verbose_name="Display Order")
+    
+    # Tile-specific overrides
+    custom_title = models.CharField(max_length=100, blank=True, null=True,
+                                   verbose_name="Custom Title",
+                                   help_text="Override the default tile title")
+    custom_color = ColorField(blank=True, null=True, verbose_name="Custom Color",
+                             help_text="Override the default tile color")
+    is_visible = models.BooleanField(default=True, verbose_name="Visible")
+    
+    class Meta:
+        ordering = ['order']
+        unique_together = ['sport_config', 'tile']
+        verbose_name = "Sport Tile Order"
+        verbose_name_plural = "Sport Tile Orders"
+    
+    def __str__(self):
+        return f"{self.sport_config.sport.name} - {self.tile.name} ({self.order})"

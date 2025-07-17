@@ -1,0 +1,124 @@
+{% load tile_tags %}
+{% load filters %}
+
+<div class="row">
+    {% for tile_result in tiles %}
+        <div class="col-lg-3 col-md-6 col-sm-6">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-5 col-md-4">
+                            <div class="icon-big text-center icon-warning">
+                                <i class="fa {{ tile_result.tile.icon }}" 
+                                   style="color: {% if tile_result.custom_color %}{{ tile_result.custom_color }}{% else %}{{ tile_result.tile.color }}{% endif %}"></i>
+                            </div>
+                        </div>
+                        <div class="col-7 col-md-8">
+                            <div class="numbers">
+                                <p class="card-category">
+                                    {% if tile_result.custom_title %}
+                                        {{ tile_result.custom_title }}
+                                    {% else %}
+                                        {{ tile_result.tile.title }}
+                                    {% endif %}
+                                </p>
+                                <p class="card-title">
+                                    {{ tile_result.formatted_value }}
+                                    {% if tile_result.tile.unit %}
+                                        <small>{{ tile_result.tile.unit }}</small>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% if tile_result.tile.description %}
+                <div class="card-footer">
+                    <div class="stats">
+                        <i class="fa fa-info-circle"></i>
+                        {{ tile_result.tile.description }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    {% empty %}
+        <!-- Fallback to default tiles if no configuration exists -->
+        <div class="col-lg-3 col-md-6 col-sm-6">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-5 col-md-4">
+                            <div class="icon-big text-center icon-warning">
+                                <i class="fa fa-road" style="color: #4ECDC4"></i>
+                            </div>
+                        </div>
+                        <div class="col-7 col-md-8">
+                            <div class="numbers">
+                                <p class="card-category">Distance</p>
+                                <p class="card-title">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 col-sm-6">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-5 col-md-4">
+                            <div class="icon-big text-center icon-warning">
+                                <i class="fa fa-clock" style="color: #FF6B6B"></i>
+                            </div>
+                        </div>
+                        <div class="col-7 col-md-8">
+                            <div class="numbers">
+                                <p class="card-category">Duration</p>
+                                <p class="card-title">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 col-sm-6">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-5 col-md-4">
+                            <div class="icon-big text-center icon-warning">
+                                <i class="fa fa-hashtag" style="color: #45B7D1"></i>
+                            </div>
+                        </div>
+                        <div class="col-7 col-md-8">
+                            <div class="numbers">
+                                <p class="card-category">Activities</p>
+                                <p class="card-title">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 col-sm-6">
+            <div class="card card-stats">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-5 col-md-4">
+                            <div class="icon-big text-center icon-warning">
+                                <i class="fa fa-fire" style="color: #FF8C42"></i>
+                            </div>
+                        </div>
+                        <div class="col-7 col-md-8">
+                            <div class="numbers">
+                                <p class="card-category">Calories</p>
+                                <p class="card-title">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>

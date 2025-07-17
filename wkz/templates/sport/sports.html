@@ -1,5 +1,6 @@
 {% extends 'lib/base.html' %}
 {% load static %}
+{% load filters %}
 {% block body %}
 <title>All Sports | Workoutizer</title>
 <div class="row">
@@ -36,7 +37,7 @@
                                         </td>
                                         <td>
                                             {% if sport.total_distance != 0.0 %}
-                                                {{ sport.total_distance }} km
+                                                {{ sport.total_distance|format_distance }} km
                                             {% else %}
                                                 -
                                             {% endif %}

@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% load tile_tags %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h2>Configurable Tiles Test</h2>
+            
+            <h3>Running Tiles</h3>
+            {% show_sport_tiles 'running' user=request.user %}
+            
+            <h3>Weight Training Tiles</h3>
+            {% show_sport_tiles 'weight-training' user=request.user %}
+            
+            <h3>Yoga Tiles</h3>
+            {% show_sport_tiles 'yoga' user=request.user %}
+            
+            <h3>Default Tiles (All Activities)</h3>
+            {% show_default_tiles user=request.user %}
+        </div>
+    </div>
+</div>
+{% endblock %}

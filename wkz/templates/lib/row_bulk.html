@@ -46,7 +46,7 @@
             {% if a.distance == 0.0 %}
 
             {% else %}
-                {{ a.distance }}
+                {{ a.distance|format_distance }}
             {% endif %}
         </td>
     </tr>

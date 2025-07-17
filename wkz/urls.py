@@ -29,6 +29,8 @@ urlpatterns = [
     path("activity/<slug:activity_id>/download/", activity_views.download_activity, name="download-activity"),
     path("add-activity/", activity_views.add_activity_view, name="add-activity"),
     re_path(r"^activity/(?P<pk>\d+)/delete/$", activity_views.ActivityDeleteView.as_view(), name="delete-activity"),
+    # Test tiles
+    path("test-tiles/", views.test_tiles, name="test-tiles"),
     # Sports
     path("sport/<slug:sports_name_slug>", sport_views.SportView.as_view(), name="sport"),
     path("sports/", sport_views.SportsView.as_view(), name="sports"),

@@ -115,6 +115,7 @@ class PlotView:
             base_filter['user'] = self.request.user
             
         if sport_id:
+            # sport_id should be a numeric ID, not a slug
             base_filter['sport'] = sport_id
             
         activities = models.Activity.objects.filter(**base_filter).order_by("-date")
@@ -260,7 +261,7 @@ def get_summary_of_all_activities(user=None, sport_slug=None):
         total_distance = all_activities.aggregate(Sum("distance"))
         seven_days_trend = all_activities.filter(date__gt=seven_days_back).aggregate(Sum("duration"))
     duration = total_duration["duration__sum"] if total_duration["duration__sum"] else datetime.timedelta(minutes=0)
-    distance = int(total_distance["distance__sum"]) if total_distance["distance__sum"] else 0
+    distance = round(total_distance["distance__sum"], 2) if total_distance["distance__sum"] else 0
     seven_days_trend = (
         seven_days_trend["duration__sum"] if seven_days_trend["duration__sum"] else datetime.timedelta(minutes=0)
     )
@@ -291,7 +292,7 @@ def get_flat_list_of_pks_of_activities_in_top_awards(user, filter_on_sport: Unio
         sport_slugs = [filter_on_sport]
     else:
         sport_slugs = [
-            sport.slug for sport in models.Sport.objects.filter(user=user, evaluates_for_awards=True).exclude(name="unknown")
+            sport.slug for sport in models.Sport.objects.filter(is_system_sport=True, evaluates_for_awards=True).exclude(name="unknown")
         ]
     for sport in sport_slugs:
         for bs in cfg.best_sections:
@@ -363,3 +364,9 @@ def fetch_row_data_for_page(page_nr: int, sport_slug=None, user=None):
         log.debug("reached end of the table")
         is_last_page = True
     return activities, is_last_page
+
+
+@login_required
+def test_tiles(request):
+    """Test view for configurable tiles"""
+    return render(request, "test_tiles.html")

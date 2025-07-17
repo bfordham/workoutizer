@@ -1,4 +1,5 @@
 {% extends "lib/base.html" %}
+{% load filters %}
 
 {% block body %}
 <div class="row">
@@ -21,7 +22,7 @@
                     <div class="col-md-12">
                         <div class="form-group">
                             <label>Total Distance</label>
-                            <p class="form-control-static">{{ total_distance }} km</p>
+                            <p class="form-control-static">{{ total_distance|format_distance }} km</p>
                         </div>
                     </div>
                 </div>
@@ -70,7 +71,7 @@
                                     <td>{{ activity.date|date:"M j, Y" }}</td>
                                     <td>
                                         {% if activity.distance %}
-                                            {{ activity.distance|floatformat:1 }} km
+                                            {{ activity.distance|format_distance }} km
                                         {% else %}
                                             -
                                         {% endif %}

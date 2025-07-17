@@ -1,6 +1,8 @@
 import json
 import logging
 import os
+import gzip
+import tempfile
 from pathlib import Path
 from types import ModuleType
 from typing import Dict, List, Tuple, Union
@@ -213,21 +215,52 @@ def _get_md5sums_from_model(traces_model) -> List[str]:
 def _parse_data(file: Path, md5sum: str) -> Union[FITParser, GPXParser]:
     file = str(file)
     log.debug(f"importing {file} ...")
-    if file.lower().endswith(".gpx"):
-        log.debug("parsing GPX file ...")
-        parser = GPXParser(path_to_file=file, md5sum=md5sum)
-    elif file.lower().endswith(".fit"):
-        log.debug("parsing FIT file ...")
-        parser = FITParser(path_to_file=file, md5sum=md5sum)
-    else:
-        log.error(f"file type: {file} unknown")
-        raise NotImplementedError(
-            f"Cannot parse {file} files. The only supported file formats are: {configuration.supported_formats}."
-        )
-    # parse best sections
-    parser.get_best_sections()
-    log.debug(f"finished parsing file {file}.")
-    return parser
+    
+    # Handle compressed files
+    temp_file_path = None
+    original_file = file
+    
+    if file.lower().endswith(".gz"):
+        # Decompress file to a temporary location
+        base_name = os.path.basename(file[:-3])  # Remove .gz extension
+        
+        try:
+            with tempfile.NamedTemporaryFile(suffix=f'_{base_name}', delete=False) as temp_file:
+                with gzip.open(file, 'rb') as gz_file:
+                    temp_file.write(gz_file.read())
+                temp_file_path = temp_file.name
+                file = temp_file_path  # Use decompressed file for parsing
+                log.debug(f"decompressed {original_file} to {temp_file_path}")
+        except Exception as e:
+            log.error(f"Failed to decompress {original_file}: {e}")
+            raise
+    
+    try:
+        if file.lower().endswith(".gpx") or original_file.lower().endswith(".gpx.gz"):
+            log.debug("parsing GPX file ...")
+            parser = GPXParser(path_to_file=file, md5sum=md5sum)
+        elif file.lower().endswith(".fit") or original_file.lower().endswith(".fit.gz"):
+            log.debug("parsing FIT file ...")
+            parser = FITParser(path_to_file=file, md5sum=md5sum)
+        else:
+            log.error(f"file type: {original_file} unknown")
+            raise NotImplementedError(
+                f"Cannot parse {original_file} files. The only supported file formats are: {configuration.supported_formats}."
+            )
+        
+        # parse best sections
+        parser.get_best_sections()
+        log.debug(f"finished parsing file {original_file}.")
+        return parser
+        
+    finally:
+        # Clean up temporary file if created
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.unlink(temp_file_path)
+                log.debug(f"cleaned up temporary file {temp_file_path}")
+            except Exception as e:
+                log.warning(f"Failed to clean up temporary file {temp_file_path}: {e}")
 
 
 def _get_all_files(path: Path) -> List[Path]:

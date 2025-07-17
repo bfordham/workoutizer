@@ -4,7 +4,7 @@ from wkz.best_sections.climb import BestClimbSections
 from wkz.best_sections.fastest import FastestSections
 
 # supported for parsing
-supported_formats = {"gpx", "fit"}
+supported_formats = {"gpx", "fit", "gpx.gz", "fit.gz"}
 
 # cannot be edited nor deleted
 protected_sports = {"unknown"}
